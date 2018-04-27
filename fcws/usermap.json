@@ -1,0 +1,3 @@
+{
+    "__comment__": "This file can be used to specify the celery queue used by specific non-admin users (admins have their own admin queue).  Keys should be user nicks, and values should be existing celery queues.  Any user not found will use the default queue."
+}

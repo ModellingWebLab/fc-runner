@@ -1,0 +1,17 @@
+{
+    "password": "YOUR_BACKEND_PASSWORD",
+    "chaste_root": "PATH_TO_CHASTE",
+    "exe_path": "PATH_TO_BACKEND_EXE",
+    "syntax_check_path": "PATH_TO_SYNTAX_CHECKER_EXE",
+    "temp_dir": "/tmp/",
+    "temp_file_prefix": "fc_tmp_",
+    "debug_log_file_prefix": "fc_log_",
+    "environment": {
+        "comment": "Environment variables used when running the backend executable; other settings are inherited from the webserver environment.",
+        "LD_LIBRARY_PATH": "",
+        "CHASTE_TEST_OUTPUT": "/tmp/fc_webservice_testoutput",
+        "USER": "USERNAME",
+        "GROUP": "GROUP",
+        "HOME": "/home/USERNAME"
+    }
+}
