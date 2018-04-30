@@ -17,7 +17,9 @@ def GetQueue(user, isAdmin):
         # Check that the queue has (or at least, had!) consumers and fall back to default if not
         if queue not in checked_queues:
             from .tasks import app
-            if queue not in [q['name'] for l in app.control.inspect().active_queues().values() for q in l]:
+            if queue not in [q['name']
+                             for l in app.control.inspect().active_queues().values()
+                             for q in l]:
                 queue = 'default'
             else:
                 checked_queues.add(queue)
@@ -28,9 +30,10 @@ def ScheduleExperiment(callbackUrl, signature, modelUrl, protoUrl, user='', isAd
     """Schedule a new experiment for execution."""
     from .tasks import CheckExperiment
     # Submit the job
-    result = CheckExperiment.apply_async((callbackUrl, signature, modelUrl, protoUrl), queue=GetQueue(user, isAdmin))
+    result = CheckExperiment.apply_async(
+        (callbackUrl, signature, modelUrl, protoUrl), queue=GetQueue(user, isAdmin))
     # Tell web interface that the call was successful
-    print signature, "succ", result.task_id
+    print(signature, "succ", result.task_id)
 
 
 def CancelExperiment(taskId):

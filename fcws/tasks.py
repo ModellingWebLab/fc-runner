@@ -24,12 +24,13 @@ app.config_from_object(celeryconfig)
 
 def Callback(callbackUrl, signature, data, json=False, isRetriedError=False, **kwargs):
     """Make a callback to the front-end server.
-    
+
     @param callbackUrl: URL to send callback to
     @param signature: unique identifier for this web service call
     @param data: the data to POST
     @param json: whether to send data as JSON
-    @param isRetriedError: whether this callback is simply to report that a previous callback timed out
+    @param isRetriedError: whether this callback is simply to report
+        that a previous callback timed out
     @param kwargs: extra parameters for requests.post
     """
     data['signature'] = signature
@@ -42,26 +43,30 @@ def Callback(callbackUrl, signature, data, json=False, isRetriedError=False, **k
             r = requests.post(callbackUrl, verify=False, **kwargs)
             r.raise_for_status()
         except requests.exceptions.RequestException as e:
-            print "Error attempting callback at attempt %d: %s" % (attempt+1, str(e))
-            time.sleep(60 * 2.0**attempt) # Exponential backoff, in seconds
+            print("Error attempting callback at attempt %d: %s" % (attempt + 1, str(e)))
+            time.sleep(60 * 2.0**attempt)  # Exponential backoff, in seconds
             # Rewind any file handles so we read from the beginning again
             for fp in kwargs.get('files', {}).itervalues():
                 fp.seek(0)
         else:
-            break # Callback successful so don't try again
+            break  # Callback successful so don't try again
     else:
-        print "Giving up on callback after %d attempts." % celeryconfig.WEB_LAB_MAX_CALLBACK_ATTEMPTS
+        print("Giving up on callback after %d attempts." %
+              celeryconfig.WEB_LAB_MAX_CALLBACK_ATTEMPTS)
         if not isRetriedError:
             # This is the first time we're giving up, so define an error message for later delivery
             data = {'returntype': 'failed', 'returnmsg': 'No response received from server'}
-        NotifyOfError.apply_async((callbackUrl, signature, data), queue=GetQueue('', True), countdown=60*5)
+        NotifyOfError.apply_async(
+            (callbackUrl, signature, data), queue=GetQueue('', True), countdown=60 * 5)
     return r
 
 
 def ReportError(callbackUrl, signature, prefix="failed due to unexpected error: ", json=False):
     """Report an unexpected error, with details, to the front-end, then re-raise."""
-    import sys, traceback
-    message = prefix + sys.exc_info()[0].__name__ + ": " + str(sys.exc_info()[1]) + "<br/>Full internal details follow:<br/>"
+    import sys
+    import traceback
+    message = (prefix + sys.exc_info()[0].__name__ + ": " + str(sys.exc_info()[1]) +
+               "<br/>Full internal details follow:<br/>")
     message += traceback.format_exc().replace('\n', '<br/>')
     Callback(callbackUrl, signature, {'returntype': 'failed', 'returnmsg': message}, json=json)
     raise
@@ -97,17 +102,23 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
         # Check a full parse of the protocol succeeds; only continue if it does
         for key, value in config['environment'].iteritems():
             os.environ[key] = value
-        child = subprocess.Popen([config['syntax_check_path'], main_proto_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        child = subprocess.Popen(
+            [config['syntax_check_path'], main_proto_path],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output, unused_err = child.communicate()
         retcode = child.poll()
         if retcode:
-            Callback(callbackUrl, signature, {'returntype': 'failed', 'returnmsg': error_prefix + output}, json=True)
+            Callback(callbackUrl, signature,
+                     {'returntype': 'failed', 'returnmsg': error_prefix + output},
+                     json=True)
         else:
             # Determine the interface, getting sets of ontology terms
             required_terms, optional_terms = utils.GetProtoInterface(main_proto_path)
             # Report back
             Callback(callbackUrl, signature,
-                     {'returntype': 'success', 'required': list(required_terms), 'optional': list(optional_terms)},
+                     {'returntype': 'success',
+                      'required': list(required_terms),
+                      'optional': list(optional_terms)},
                      json=True)
     except:
         ReportError(callbackUrl, signature, prefix=error_prefix, json=True)
@@ -117,14 +128,14 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
             shutil.rmtree(temp_dir)
 
 
-
 @app.task(name="fcws.tasks.CheckExperiment")
 def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
     """Check a model/protocol combination for compatibility.
 
     If the interfaces match up, then the experiment can be run.
     Otherwise, we alert the front-end to update the experiment status.
-    As a side effect this downloads & unpacks the model & protocol definitions, ready for the RunExperiment task.
+    As a side effect this downloads & unpacks the model & protocol definitions,
+    ready for the RunExperiment task.
 
     @param callbackUrl: URL to post status updates to
     @param signature: unique identifier for this experiment run
@@ -138,26 +149,29 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
         proto_path = os.path.join(temp_dir, 'protocol.zip')
         utils.Wget(modelUrl, model_path)
         utils.Wget(protocolUrl, proto_path)
-    
+
         # Unpack the model & protocol
         main_model_path = utils.UnpackArchive(model_path, temp_dir, 'model')
         main_proto_path = utils.UnpackArchive(proto_path, temp_dir, 'proto')
-    
+
         # Check whether their interfaces are compatible
-        missing_terms, missing_optional_terms = utils.DetermineCompatibility(main_proto_path, main_model_path)
+        missing_terms, missing_optional_terms = utils.DetermineCompatibility(main_proto_path,
+                                                                             main_model_path)
         if missing_terms:
-            message = "inapplicable - required ontology terms are not present in the model. Missing terms are:<br/>"
+            message = ("inapplicable - required ontology terms are not present in the model."
+                       " Missing terms are:<br/>")
             for term in missing_terms:
                 message += "&nbsp;" * 4 + term + "<br/>"
             if missing_optional_terms:
                 message += "Missing optional terms are:<br/>"
                 for term in missing_optional_terms:
-                    message +="&nbsp;" * 4 + term + "<br/>"
+                    message += "&nbsp;" * 4 + term + "<br/>"
             # Report & clean up temporary files
             Callback(callbackUrl, signature, {'returntype': 'inapplicable', 'returnmsg': message})
             shutil.rmtree(temp_dir)
         else:
-            # Run the experiment directly in this task, to ensure it has access to the unpacked model & protocol
+            # Run the experiment directly in this task,
+            # to ensure it has access to the unpacked model & protocol
             RunExperiment(callbackUrl, signature, main_model_path, main_proto_path, temp_dir)
     except:
         ReportError(callbackUrl, signature)
@@ -166,7 +180,7 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
 @app.task(name="fcws.tasks.RunExperiment")
 def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
     """Run a functional curation experiment.
-    
+
     @param callbackUrl: URL to post status updates and results to
     @param signature: unique identifier for this experiment run
     @param modelPath: path to the main model file
@@ -176,7 +190,7 @@ def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
     try:
         # Tell the website we've started running
         Callback(callbackUrl, signature, {'returntype': 'running'})
-    
+
         # Call FunctionalCuration exe, writing output to the temporary folder containing inputs
         # (or rather, a subfolder thereof).
         # Also redirect stdout and stderr so we can debug any issues.
@@ -190,7 +204,8 @@ def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
             child = subprocess.Popen(args, stdout=output_file, stderr=subprocess.STDOUT)
             child.wait()
         except SoftTimeLimitExceeded:
-            # If we're timed out, kill off the child process, but send back any partial output - don't re-raise
+            # If we're timed out, kill off the child process, but send back any partial output
+            # - don't re-raise
             child.terminate()
             time.sleep(5)
             child.kill()
@@ -202,14 +217,15 @@ def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
             child.kill()
             raise
         output_file.close()
-    
+
         # Zip up the outputs and post them to the callback
         output_path = os.path.join(tempDir, 'output.zip')
-        output_files = glob.glob(os.path.join(tempDir, 'output', '*', '*', '*')) # Yuck!
+        output_files = glob.glob(os.path.join(tempDir, 'output', '*', '*', '*'))  # Yuck!
         output_zip = zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED)
         output_zip.write(child_stdout_name, 'stdout.txt')
         if timeout:
-            # Add a message about the timeout to the errors.txt file (which is created if not present)
+            # Add a message about the timeout to the errors.txt file
+            # (which is created if not present)
             for ofile in output_files:
                 if os.path.isfile(ofile) and os.path.basename(ofile) == "errors.txt":
                     error_file_path = ofile
@@ -233,17 +249,18 @@ def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
         else:
             for filename in output_zip.namelist():
                 if filename.endswith('gnuplot_data.csv'):
-                    outcome = 'partial' # Some output plots created => might be useful
+                    outcome = 'partial'  # Some output plots created => might be useful
                     break
             else:
-                outcome = 'failed' # No outputs created => total failure
+                outcome = 'failed'  # No outputs created => total failure
         # Add a manifest if Chaste didn't create one
         if 'manifest.xml' not in output_zip.namelist():
             manifest = open(os.path.join(tempDir, 'manifest.xml'), 'w')
             manifest.write("""<?xml version='1.0' encoding='utf-8'?>
-        <omexManifest xmlns='http://identifiers.org/combine.specifications/omex-manifest'>
-          <content location='manifest.xml' format='http://identifiers.org/combine.specifications/omex-manifest'/>
-        """)
+<omexManifest xmlns='http://identifiers.org/combine.specifications/omex-manifest'>
+    <content location='manifest.xml'
+             format='http://identifiers.org/combine.specifications/omex-manifest'/>
+""")
             for filename in output_zip.namelist():
                 try:
                     ext = os.path.splitext(filename)[1]
@@ -253,8 +270,8 @@ def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
                               '.eps': 'application/postscript',
                               '.xml': 'text/xml',
                               '.cellml': 'http://identifiers.org/combine.specifications/cellml.1.0'
-                             }[ext]
-                except:
+                              }[ext]
+                except Exception:
                     format = 'application/octet-stream'
                 manifest.write("  <content location='%s' format='%s'/>\n" % (filename, format))
             manifest.write("</omexManifest>")
@@ -276,7 +293,7 @@ def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
 @app.task(name="fcws.tasks.NotifyOfError")
 def NotifyOfError(callbackUrl, signature, data):
     """Keep trying to contact the front-end with a short error message.
-    
+
     @param callbackUrl: URL to post error to
     @param signature: unique identifier for this web service call
     @param data: POST data containing the error message string (see Callback for construction)

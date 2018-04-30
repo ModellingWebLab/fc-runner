@@ -2,7 +2,7 @@
 # See /etc/default/celeryd for node-specific configuration.
 
 CELERY_TASK_SERIALIZER = 'json'
-CELERY_ACCEPT_CONTENT=['json']
+CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TIMEZONE = 'Europe/London'
 CELERY_ENABLE_UTC = True
 
@@ -10,7 +10,7 @@ CELERY_ENABLE_UTC = True
 BROKER_URL = 'amqp://guest@localhost'
 
 # Default queue name to use
-CELERY_DEFAULT_QUEUE="default"
+CELERY_DEFAULT_QUEUE = "default"
 
 # We expect to have few tasks, but long running, so don't reserve more than you're working on
 # (this works well combined with the -Ofair option to the workers)
