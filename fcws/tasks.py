@@ -75,7 +75,7 @@ def ReportError(callbackUrl, signature, prefix="failed due to unexpected error: 
 def MakeTempDir():
     """Make a temporary folder within the configured location."""
     try:
-        os.makedirs(config['temp_dir'], 0775)
+        os.makedirs(config['temp_dir'], 0o775)
     except os.error:
         pass
     return tempfile.mkdtemp(dir=config['temp_dir'])
