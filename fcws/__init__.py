@@ -1,5 +1,7 @@
 # Back-end web service routines for the functional curation website
 
+from __future__ import print_function
+
 import json
 import os
 
