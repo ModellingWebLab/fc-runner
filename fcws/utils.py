@@ -34,7 +34,7 @@ import pycml  # noqa
 def Wget(url, localPath, signature):
     """Retrieve a binary file from the given URL and save it to disk."""
     source = requests.get(url, stream=True, verify=False, headers={
-        'Authorization: Token ' + signature
+        'Authorization': 'Token ' + signature
     })
     source.raise_for_status()
     with open(localPath, 'wb') as local_file:
