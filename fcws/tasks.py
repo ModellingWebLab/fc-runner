@@ -99,7 +99,7 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
         # Download the protocol archive to a temporary folder & unpack
         temp_dir = MakeTempDir()
         proto_path = os.path.join(temp_dir, 'protocol.zip')
-        utils.Wget(protocolUrl, proto_path)
+        utils.Wget(protocolUrl, proto_path, signature)
         main_proto_path = utils.UnpackArchive(proto_path, temp_dir, 'proto')
         # Check a full parse of the protocol succeeds; only continue if it does
         for key, value in config['environment'].iteritems():
@@ -149,8 +149,8 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
         temp_dir = MakeTempDir()
         model_path = os.path.join(temp_dir, 'model.zip')
         proto_path = os.path.join(temp_dir, 'protocol.zip')
-        utils.Wget(modelUrl, model_path)
-        utils.Wget(protocolUrl, proto_path)
+        utils.Wget(modelUrl, model_path, signature)
+        utils.Wget(protocolUrl, proto_path, signature)
 
         # Unpack the model & protocol
         main_model_path = utils.UnpackArchive(model_path, temp_dir, 'model')

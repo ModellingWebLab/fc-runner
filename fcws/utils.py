@@ -26,14 +26,16 @@ MANIFEST = 'manifest.xml'
 sys.path[0:0] = [os.path.join(FC_ROOT, 'src/proto/parsing'),
                  os.path.join(FC_ROOT, 'src/python'),
                  os.path.join(CHASTE_ROOT, 'python/pycml')]
-import CompactSyntaxParser as CSP
-import cellml_metadata
-import pycml
+import CompactSyntaxParser as CSP  # noqa
+import cellml_metadata  # noqa
+import pycml  # noqa
 
 
-def Wget(url, localPath):
+def Wget(url, localPath, signature):
     """Retrieve a binary file from the given URL and save it to disk."""
-    source = requests.get(url, stream=True, verify=False)
+    source = requests.get(url, stream=True, verify=False, headers={
+        'Authorization: Token ' + signature
+    })
     source.raise_for_status()
     with open(localPath, 'wb') as local_file:
         for chunk in source.iter_content(chunk_size=10240):
