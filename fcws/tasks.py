@@ -40,6 +40,8 @@ def Callback(callbackUrl, signature, data, json=False, isRetriedError=False, **k
         kwargs['json'] = data
     else:
         kwargs['data'] = data
+    r = requests.Response()  # In case we never get through
+    r.status_code = 500
     for attempt in range(celeryconfig.WEB_LAB_MAX_CALLBACK_ATTEMPTS):
         try:
             r = requests.post(callbackUrl, verify=False, **kwargs)
@@ -58,8 +60,8 @@ def Callback(callbackUrl, signature, data, json=False, isRetriedError=False, **k
         if not isRetriedError:
             # This is the first time we're giving up, so define an error message for later delivery
             data = {'returntype': 'failed', 'returnmsg': 'No response received from server'}
-        NotifyOfError.apply_async(
-            (callbackUrl, signature, data), queue=GetQueue('', True), countdown=60 * 5)
+            NotifyOfError.apply_async(
+                (callbackUrl, signature, data), queue=GetQueue('', True), countdown=60 * 5)
     return r
 
 
