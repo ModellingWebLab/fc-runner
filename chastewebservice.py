@@ -42,17 +42,34 @@ else:
     for field in ['callBack', 'signature', 'model', 'protocol', 'user', 'isAdmin']:
         if field not in form:
             SendError("Missing required field.")
+    if 'fittingSpecUrl' in form or 'fittingDataUrl' in form:
+        for field in ['fittingSpecUrl', 'fittingDataUrl']:
+            if field not in form:
+                SendError("Missing required field for fitting.")
+        fittingSpecUrl = form['fittingSpecUrl'].value
+        fittingDataUrl = form['fittingDataUrl'].value
+    else:
+        fittingSpecUrl = fittingDataUrl = None
 
     print("Content-Type: text/plain\n\n")
-    signature = form["signature"]
+    signature = form["signature"].value
     # Wrap the rest in a try so we alert the caller properly if an exception occurs
     try:
-        callBack = form["callBack"]
-        modelUrl = form["model"]
-        protocolUrl = form["protocol"]
-        fcws.ScheduleExperiment(callBack.value, signature.value, modelUrl.value, protocolUrl.value,
-                                user=form['user'].value, isAdmin=(form['isAdmin'].value == 'true'))
+        callBack = form["callBack"].value
+        modelUrl = form["model"].value
+        protocolUrl = form["protocol"].value
+        fcws.ScheduleExperiment(
+            callBack,
+            signature,
+            modelUrl,
+            protocolUrl,
+            fittingSpecUrl=fittingSpecUrl,
+            fittingDataUrl=fittingDataUrl,
+            user=form['user'].value,
+            isAdmin=(form['isAdmin'].value == 'true'),
+        )
     except Exception as e:
         print(signature.value, "failed due to unexpected error:", e, "<br/>")
         print("Full internal details follow:<br/>")
         raise
+

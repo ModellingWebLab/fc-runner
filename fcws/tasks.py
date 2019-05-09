@@ -133,7 +133,9 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
 
 
 @app.task(name="fcws.tasks.CheckExperiment")
-def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
+def CheckExperiment(
+        callbackUrl, signature, modelUrl, protocolUrl, fittingSpecUrl,
+        fittingDataUrl):
     """Check a model/protocol combination for compatibility.
 
     If the interfaces match up, then the experiment can be run.
@@ -145,12 +147,15 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
     @param signature: unique identifier for this experiment run
     @param modelUrl: where to download the model archive from
     @param protoUrl: where to download the protocol archive from
+    @param fittingSpecUrl: where to download the optional fitting spec from
+    @param fittingDataUrl: where to download the optional fitting data from
     """
     try:
         # Download the submitted COMBINE archives to disk in a temporary folder
         temp_dir = MakeTempDir()
         model_path = os.path.join(temp_dir, 'model.zip')
         proto_path = os.path.join(temp_dir, 'protocol.zip')
+
         utils.Wget(modelUrl, model_path, signature)
         utils.Wget(protocolUrl, proto_path, signature)
 
@@ -158,9 +163,19 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
         main_model_path = utils.UnpackArchive(model_path, temp_dir, 'model')
         main_proto_path = utils.UnpackArchive(proto_path, temp_dir, 'proto')
 
+        # Download and unpack fitting files
+        if fittingSpecUrl and fittingDataUrl:
+            fspec_path = os.path.join(temp_dir. 'fittingSpec.zip')
+            fdata_path = os.path.join(temp_dir, 'fittingData.zip')
+            utils.Wget(fittingSpecUrl, fspec_path, signature)
+            utils.Wget(fittingDataUrl, fdata_path, signature)
+            main_fspec_path = utils.UnpackArchive(fspec_path, temp_dir, 'fspec')
+            main_fdata_path = utils.UnpackArchive(fdata_path, temp_dir, 'fdata')
+
         # Check whether their interfaces are compatible
-        missing_terms, missing_optional_terms = utils.DetermineCompatibility(main_proto_path,
-                                                                             main_model_path)
+        missing_terms, missing_optional_terms = utils.DetermineCompatibility(
+            main_proto_path, main_model_path)
+        #TODO: CHECK FOR MISSING FSPEC/FDATA TERMS
         if missing_terms:
             message = ("inapplicable - required ontology terms are not present in the model."
                        " Missing terms are:<br/>")
@@ -176,19 +191,31 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
         else:
             # Run the experiment directly in this task,
             # to ensure it has access to the unpacked model & protocol
-            RunExperiment(callbackUrl, signature, main_model_path, main_proto_path, temp_dir)
+            RunExperiment(
+                callbackUrl,
+                signature,
+                main_model_path,
+                main_proto_path,
+                main_fspec_path,
+                main_fdata_path,
+                temp_dir,
+            )
     except:
         ReportError(callbackUrl, signature)
 
 
 @app.task(name="fcws.tasks.RunExperiment")
-def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
+def RunExperiment(
+        callbackUrl, signature, modelPath, protoPath, fspecPath, fdataPath,
+        tempDir):
     """Run a functional curation experiment.
 
     @param callbackUrl: URL to post status updates and results to
     @param signature: unique identifier for this experiment run
     @param modelPath: path to the main model file
     @param protoPath: path to the main protocol file
+    @param fspecPath: path to the main fitting specification file (or None)
+    @param fdataPath: path to the main fitting data file (or None)
     @param tempDir: folder in which to store any temporary files
     """
     try:
@@ -200,7 +227,24 @@ def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
         # Also redirect stdout and stderr so we can debug any issues.
         for key, value in config['environment'].iteritems():
             os.environ[key] = value
-        args = [config['exe_path'], modelPath, protoPath, os.path.join(tempDir, 'output')]
+
+        if fspecPath and fdataPath:
+            args = [
+                config['fitting_path'],
+                modelPath,
+                protoPath,
+                fspecPath,
+                fdataPath,
+                os.path.join(tempDir, 'output'),
+            ]
+        else:
+            args = [
+                config['exe_path'],
+                modelPath,
+                protoPath,
+                os.path.join(tempDir, 'output'),
+            ]
+
         child_stdout_name = os.path.join(tempDir, 'stdout.txt')
         output_file = open(child_stdout_name, 'w')
         timeout = False
