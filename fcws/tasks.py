@@ -171,6 +171,8 @@ def CheckExperiment(
             utils.Wget(fittingDataUrl, fdata_path, signature)
             main_fspec_path = utils.UnpackArchive(fspec_path, temp_dir, 'fspec')
             main_fdata_path = utils.UnpackArchive(fdata_path, temp_dir, 'fdata')
+        else:
+            main_fspec_path = main_fdata_path = None
 
         # Check whether their interfaces are compatible
         missing_terms, missing_optional_terms = utils.DetermineCompatibility(
