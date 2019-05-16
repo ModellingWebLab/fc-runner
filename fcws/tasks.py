@@ -165,7 +165,7 @@ def CheckExperiment(
 
         # Download and unpack fitting files
         if fittingSpecUrl and fittingDataUrl:
-            fspec_path = os.path.join(temp_dir. 'fittingSpec.zip')
+            fspec_path = os.path.join(temp_dir, 'fittingSpec.zip')
             fdata_path = os.path.join(temp_dir, 'fittingData.zip')
             utils.Wget(fittingSpecUrl, fspec_path, signature)
             utils.Wget(fittingDataUrl, fdata_path, signature)
