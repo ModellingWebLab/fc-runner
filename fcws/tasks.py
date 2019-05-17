@@ -47,7 +47,7 @@ def Callback(callbackUrl, signature, data, json=False, isRetriedError=False, **k
         try:
             r = requests.post(callbackUrl, verify=False, **kwargs)
             r.raise_for_status()
-        except requests.exceptions.RequestException as e:
+        except (requests.exceptions.RequestException, SoftTimeLimitExceeded) as e:
             print("Error attempting callback at attempt %d: %s" % (attempt + 1, str(e)))
             time.sleep(60 * 2.0**attempt)  # Exponential backoff, in seconds
             # Rewind any file handles so we read from the beginning again
