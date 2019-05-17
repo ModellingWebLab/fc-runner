@@ -258,8 +258,10 @@ def RunExperiment(
         if fspecPath and fdataPath:
             log.info('Running fitting experiment')
 
+            for key, value in config['environment'].iteritems():
+                os.environ[key] = value
+
             args = [
-                'python',
                 config['fitting_path'],
                 modelPath,
                 protoPath,
@@ -281,10 +283,11 @@ def RunExperiment(
         child_stdout_name = os.path.join(tempDir, 'stdout.txt')
         output_file = open(child_stdout_name, 'w')
         timeout = False
+        retcode = 0
         try:
             child = None
             child = subprocess.Popen(args, stdout=output_file, stderr=subprocess.STDOUT)
-            child.wait()
+            retcode = child.wait()
         except SoftTimeLimitExceeded:
             # If we're timed out, kill off the child process, but send back any partial output
             # - don't re-raise
@@ -300,6 +303,13 @@ def RunExperiment(
                 child.kill()
             raise
         output_file.close()
+
+        #TODO
+        #if retcode:
+        #    Callback(callbackUrl, signature,
+        #        {'returntype': 'failed', 'returnmsg': output},
+        #        json=True
+        #    )
 
         # Zip up the outputs and post them to the callback
         output_path = os.path.join(tempDir, 'output.zip')
