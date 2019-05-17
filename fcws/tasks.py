@@ -205,6 +205,7 @@ def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
         output_file = open(child_stdout_name, 'w')
         timeout = False
         try:
+            child = None
             child = subprocess.Popen(args, stdout=output_file, stderr=subprocess.STDOUT)
             child.wait()
         except SoftTimeLimitExceeded:
@@ -216,9 +217,10 @@ def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
             timeout = True
         except:
             # If any other error happens, just make sure the child is dead then report it
-            child.terminate()
-            time.sleep(5)
-            child.kill()
+            if child is not None:
+                child.terminate()
+                time.sleep(5)
+                child.kill()
             raise
         output_file.close()
 
