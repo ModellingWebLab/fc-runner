@@ -228,7 +228,7 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
         ReportError(callbackUrl, signature)
 
 
-@app.task(name="fcws.tasks.RunExperiment", soft_time_limit=1e99)
+#@app.task(name="fcws.tasks.RunExperiment", soft_time_limit=1e99)
 def RunExperiment(
         callbackUrl, signature, modelPath, protoPath, fspecPath, fdataPath,
         tempDir):
