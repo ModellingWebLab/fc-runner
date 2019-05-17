@@ -255,8 +255,6 @@ def RunExperiment(
         for key, value in config['environment'].iteritems():
             os.environ[key] = value
 
-        raise Exception(str(fspecPath) + ' :: ' + str(fdataPath))
-
         if fspecPath and fdataPath:
 
             raise Exception('Hurray we are here')
