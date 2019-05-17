@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import glob
 import os
+import logging
 import shutil
 import subprocess
 import tempfile
@@ -146,6 +147,8 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
     @param modelUrl: where to download the model archive from
     @param protocolUrl: where to download the protocol archive from
     """
+    log = logging.getLogger(__name__)
+
     try:
         # Download the submitted COMBINE archives to disk in temporary folder
         temp_dir = MakeTempDir()
@@ -164,14 +167,18 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
         proto_file = os.path.basename(main_proto_path)
         for filename in os.listdir(proto_dir):
             if filename == proto_file:
+                log.info(filename + ' is the main file')
                 continue
-            base, ext = os.path.split(filename)
+            log.info(filename + ' is not the main file')
+            base, ext = os.path.splitext(filename)
             ext = ext.lower()
+            log.info('Extension: ' + ext)
             if ext == '.txt':
                 if fitting_spec_path is None:
                     fitting_spec_path = os.path.join(proto_dir, filename)
                 else:
                     # Ambiguous result, not a fitting experiment
+                    log.warning('Ambiguous result: unsetting fitting spec path')
                     fitting_spec_path = None
                     break
             elif ext == '.csv':
@@ -179,8 +186,11 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
                     fitting_data_path = os.path.join(proto_dir, filename)
                 else:
                     # Ambiguous result, not a fitting experiment
+                    log.warning('Ambiguous result: unsetting fitting data path')
                     fitting_data_path = None
                     break
+        log.info('Found: ' + str(fitting_spec_path) + ' and ' + str(fitting_data_path))
+
         if fitting_spec_path is None or fitting_data_path is None:
             fitting_spec_path = fitting_data_path = None
 
@@ -240,7 +250,12 @@ def RunExperiment(
         for key, value in config['environment'].iteritems():
             os.environ[key] = value
 
+        raise Exception(str(fspecPath) + ' :: ' + str(fdataPath))
+
         if fspecPath and fdataPath:
+
+            raise Exception('Hurray we are here')
+
             args = [
                 config['fitting_path'],
                 modelPath,
