@@ -259,6 +259,7 @@ def RunExperiment(
             log.info('Running fitting experiment')
 
             for key, value in config['environment'].iteritems():
+                log.info('Setting environment variable ' + key + ': ' + value)
                 os.environ[key] = value
 
             log.info('Using virtual environment ' + config['fitting_virtualenv'])
