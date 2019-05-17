@@ -133,7 +133,7 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
             shutil.rmtree(temp_dir)
 
 
-@app.task(name="fcws.tasks.CheckExperiment")
+@app.task(name="fcws.tasks.CheckExperiment", soft_time_limit=900)
 def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
     """Check a model/protocol combination for compatibility.
 
@@ -190,9 +190,11 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
                     fitting_data_path = None
                     break
         log.info('Found: ' + str(fitting_spec_path) + ' and ' + str(fitting_data_path))
-
         if fitting_spec_path is None or fitting_data_path is None:
             fitting_spec_path = fitting_data_path = None
+        else:
+            log.info('Proceeding with fitting data')
+
 
         # Check whether their interfaces are compatible
         missing_terms, missing_optional_terms = utils.DetermineCompatibility(
@@ -240,6 +242,9 @@ def RunExperiment(
     @param fdataPath: path to the main fitting data file (or None)
     @param tempDir: folder in which to store any temporary files
     """
+    log = logging.getLogger(__name__)
+    log.info('RunExperiment called with ' + str(fspecPath) + ' and ' + str(fdataPath))
+
     try:
         # Tell the website we've started running
         Callback(callbackUrl, signature, {'returntype': 'running'})
