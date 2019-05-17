@@ -264,7 +264,8 @@ def RunExperiment(
             log.info('Using virtual environment ' + config['fitting_virtualenv'])
 
             args = [
-                'source ' + config['fitting_virtualenv'] + ' activate;' + config['fitting_path'],
+                config['fitting_path'],
+                config['fitting_virtualenv'],
                 modelPath,
                 protoPath,
                 fspecPath,
