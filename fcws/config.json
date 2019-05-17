@@ -11,6 +11,8 @@
     "environment": {
         "comment": "Environment variables used when running the backend executable; other settings are inherited from the webserver environment.",
         "LD_LIBRARY_PATH": "",
+        "CHASTE_ROOT": "PATH_TO_CHASTE",
+        "FC_ROOT": "PATH_TO_FC",
         "CHASTE_TEST_OUTPUT": "/tmp/fc_webservice_testoutput",
         "USER": "USERNAME",
         "GROUP": "GROUP",
