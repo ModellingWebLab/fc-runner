@@ -29,8 +29,8 @@ def GetQueue(user, isAdmin):
 
 
 def ScheduleExperiment(
-        callbackUrl, signature, modelUrl, protoUrl, user='', isAdmin=False,
-        fittingSpecUrl=None, fittingDataUrl=None):
+        callbackUrl, signature, modelUrl, protoUrl, fittingSpecUrl=None,
+        fittingDataUrl=None, user='', isAdmin=False):
     """Schedule a new experiment for execution."""
     from .tasks import CheckExperiment
     # Submit the job

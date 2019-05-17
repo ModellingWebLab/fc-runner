@@ -39,17 +39,10 @@ elif 'getProtoInterface' in form:
     fcws.GetProtocolInterface(
         form['callBack'].value, form['signature'].value, form['getProtoInterface'].value)
 else:
+    # Standard action: schedule experiment
     for field in ['callBack', 'signature', 'model', 'protocol', 'user', 'isAdmin']:
         if field not in form:
             SendError("Missing required field.")
-    if 'fittingSpecUrl' in form or 'fittingDataUrl' in form:
-        for field in ['fittingSpecUrl', 'fittingDataUrl']:
-            if field not in form:
-                SendError("Missing required field for fitting.")
-        fittingSpecUrl = form['fittingSpecUrl'].value
-        fittingDataUrl = form['fittingDataUrl'].value
-    else:
-        fittingSpecUrl = fittingDataUrl = None
 
     print("Content-Type: text/plain\n\n")
     signature = form["signature"].value
@@ -63,8 +56,6 @@ else:
             signature,
             modelUrl,
             protocolUrl,
-            fittingSpecUrl=fittingSpecUrl,
-            fittingDataUrl=fittingDataUrl,
             user=form['user'].value,
             isAdmin=(form['isAdmin'].value == 'true'),
         )

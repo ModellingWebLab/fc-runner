@@ -133,9 +133,7 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
 
 
 @app.task(name="fcws.tasks.CheckExperiment")
-def CheckExperiment(
-        callbackUrl, signature, modelUrl, protocolUrl, fittingSpecUrl,
-        fittingDataUrl):
+def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
     """Check a model/protocol combination for compatibility.
 
     If the interfaces match up, then the experiment can be run.
@@ -146,16 +144,13 @@ def CheckExperiment(
     @param callbackUrl: URL to post status updates to
     @param signature: unique identifier for this experiment run
     @param modelUrl: where to download the model archive from
-    @param protoUrl: where to download the protocol archive from
-    @param fittingSpecUrl: where to download the optional fitting spec from
-    @param fittingDataUrl: where to download the optional fitting data from
+    @param protocolUrl: where to download the protocol archive from
     """
     try:
-        # Download the submitted COMBINE archives to disk in a temporary folder
+        # Download the submitted COMBINE archives to disk in temporary folder
         temp_dir = MakeTempDir()
         model_path = os.path.join(temp_dir, 'model.zip')
         proto_path = os.path.join(temp_dir, 'protocol.zip')
-
         utils.Wget(modelUrl, model_path, signature)
         utils.Wget(protocolUrl, proto_path, signature)
 
@@ -163,16 +158,31 @@ def CheckExperiment(
         main_model_path = utils.UnpackArchive(model_path, temp_dir, 'model')
         main_proto_path = utils.UnpackArchive(proto_path, temp_dir, 'proto')
 
-        # Download and unpack fitting files
-        if fittingSpecUrl and fittingDataUrl:
-            fspec_path = os.path.join(temp_dir, 'fittingSpec.zip')
-            fdata_path = os.path.join(temp_dir, 'fittingData.zip')
-            utils.Wget(fittingSpecUrl, fspec_path, signature)
-            utils.Wget(fittingDataUrl, fdata_path, signature)
-            main_fspec_path = utils.UnpackArchive(fspec_path, temp_dir, 'fspec')
-            main_fdata_path = utils.UnpackArchive(fdata_path, temp_dir, 'fdata')
-        else:
-            main_fspec_path = main_fdata_path = None
+        # Search for fitting files
+        fitting_spec_path = fitting_data_path = None
+        proto_dir = os.path.join(temp_dir, 'proto')
+        proto_file = os.path.basename(main_proto_path)
+        for filename in os.listdir(proto_dir):
+            if filename == proto_file:
+                continue
+            base, ext = os.path.split(filename)
+            ext = ext.lower()
+            if ext == '.txt':
+                if fitting_spec_path is None:
+                    fitting_spec_path = os.path.join(proto_dir, filename)
+                else:
+                    # Ambiguous result, not a fitting experiment
+                    fitting_spec_path = None
+                    break
+            elif ext == '.csv':
+                if fitting_data_path is None:
+                    fitting_data_path = os.path.join(proto_dir, filename)
+                else:
+                    # Ambiguous result, not a fitting experiment
+                    fitting_data_path = None
+                    break
+        if fitting_spec_path is None or fitting_data_path is None:
+            fitting_spec_path = fitting_data_path = None
 
         # Check whether their interfaces are compatible
         missing_terms, missing_optional_terms = utils.DetermineCompatibility(
@@ -198,8 +208,8 @@ def CheckExperiment(
                 signature,
                 main_model_path,
                 main_proto_path,
-                main_fspec_path,
-                main_fdata_path,
+                fitting_spec_path,
+                fitting_data_path,
                 temp_dir,
             )
     except:
