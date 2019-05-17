@@ -256,6 +256,7 @@ def RunExperiment(
             os.environ[key] = value
 
         if fspecPath and fdataPath:
+            log.info('Running fitting experiment')
 
             raise Exception('Hurray we are here')
 
@@ -268,6 +269,8 @@ def RunExperiment(
                 os.path.join(tempDir, 'output'),
             ]
         else:
+            log.info('Running functional curation experiment')
+
             args = [
                 config['exe_path'],
                 modelPath,
