@@ -3,6 +3,7 @@
     "chaste_root": "PATH_TO_CHASTE",
     "exe_path": "PATH_TO_BACKEND_EXE",
     "fitting_path": "PATH_TO_FITTING_SCRIPT",
+    "fitting_virtualenv": "PATH_TO_FITTING_VIRTUALENV",
     "syntax_check_path": "PATH_TO_SYNTAX_CHECKER_EXE",
     "temp_dir": "/tmp/",
     "temp_file_prefix": "fc_tmp_",

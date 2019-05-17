@@ -261,8 +261,10 @@ def RunExperiment(
             for key, value in config['environment'].iteritems():
                 os.environ[key] = value
 
+            log.info('Using virtual environment ' + config['fitting_virtualenv'])
+
             args = [
-                config['fitting_path'],
+                'source ' + config['fitting_virtualenv'] + ' activate;' + config['fitting_path'],
                 modelPath,
                 protoPath,
                 fspecPath,
