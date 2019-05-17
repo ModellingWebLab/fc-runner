@@ -267,7 +267,6 @@ def RunExperiment(
                 os.path.join(tempDir, 'output'),
             ]
 
-            raise Exception(config['fitting_path'])
         else:
             log.info('Running functional curation experiment')
 
