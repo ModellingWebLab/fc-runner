@@ -133,7 +133,7 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
             shutil.rmtree(temp_dir)
 
 
-@app.task(name="fcws.tasks.CheckExperiment", soft_time_limit=900)
+@app.task(name="fcws.tasks.CheckExperiment")
 def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
     """Check a model/protocol combination for compatibility.
 
@@ -228,7 +228,7 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
         ReportError(callbackUrl, signature)
 
 
-#@app.task(name="fcws.tasks.RunExperiment", soft_time_limit=1e99)
+#@app.task(name="fcws.tasks.RunExperiment")
 def RunExperiment(
         callbackUrl, signature, modelPath, protoPath, fspecPath, fdataPath,
         tempDir):
