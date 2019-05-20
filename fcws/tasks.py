@@ -290,7 +290,12 @@ def RunExperiment(
         retcode = 0
         try:
             child = None
-            child = subprocess.Popen(args, stdout=output_file, stderr=subprocess.STDOUT)
+            child = subprocess.Popen(
+                args,
+                stdout=output_file,
+                stderr=subprocess.STDOUT,
+                bufsize=1,
+            )
             retcode = child.wait()
         except SoftTimeLimitExceeded:
             # If we're timed out, kill off the child process, but send back any partial output
