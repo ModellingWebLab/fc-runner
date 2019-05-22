@@ -46,6 +46,10 @@ def Callback(callbackUrl, signature, data, json=False, isRetriedError=False, **k
         try:
             r = requests.post(callbackUrl, verify=False, **kwargs)
             r.raise_for_status()
+        except SoftTimeLimitExceeded:
+            # Just hope we managed to send relevant data!
+            print("Soft time limit thrown while sending callback")
+            break
         except requests.exceptions.RequestException as e:
             print("Error attempting callback at attempt %d: %s" % (attempt + 1, str(e)))
             time.sleep(60 * 2.0**attempt)  # Exponential backoff, in seconds
