@@ -138,7 +138,7 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
 
 
 @app.task(name="fcws.tasks.CheckExperiment")
-def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
+def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl, datasetUrl=None, fittingSpecUrl=None):
     """Check a model/protocol combination for compatibility.
 
     If the interfaces match up, then the experiment can be run.
@@ -150,6 +150,8 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
     @param signature: unique identifier for this experiment run
     @param modelUrl: where to download the model archive from
     @param protocolUrl: where to download the protocol archive from
+    @param datasetUrl: if doing a fit, where to download the reference dataset from
+    @param fittingSpecUrl: if doing a fit, the fitting specification
     """
     log = logging.getLogger(__name__)
 
@@ -165,45 +167,34 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
         main_model_path = utils.UnpackArchive(model_path, temp_dir, 'model')
         main_proto_path = utils.UnpackArchive(proto_path, temp_dir, 'proto')
 
-        # Search for fitting files
-        fitting_spec_path = fitting_data_path = None
-        proto_dir = os.path.join(temp_dir, 'proto')
-        proto_file = os.path.basename(main_proto_path)
-        for filename in os.listdir(proto_dir):
-            if filename == proto_file:
-                log.info(filename + ' is the main file')
-                continue
-            log.info(filename + ' is not the main file')
-            base, ext = os.path.splitext(filename)
-            ext = ext.lower()
-            log.info('Extension: ' + ext)
-            if ext == '.txt':
-                if fitting_spec_path is None:
-                    fitting_spec_path = os.path.join(proto_dir, filename)
+        if datasetUrl and fittingSpecUrl:
+            # We're doing a fit
+            dataset_zip = os.path.join(temp_dir, 'dataset.zip')
+            utils.Wget(datasetUrl, dataset_zip, signature)
+            fitting_data_path = utils.UnpackArchive(dataset_zip, temp_dir, 'dataset')
+            if fittingSpecUrl == protocolUrl:
+                # Temporary hack: fitting spec is part of the protocol archive
+                proto_dir, proto_name = os.path.split(main_proto_path)
+                for filename in os.listdir(proto_dir):
+                    if (filename != proto_name and
+                            os.path.splitext(filename)[1] in utils.EXPECTED_EXTENSIONS['fittingSpec']):
+                        fitting_spec_path = os.path.join(proto_dir, filename)
+                        break
                 else:
-                    # Ambiguous result, not a fitting experiment
-                    log.warning('Ambiguous result: unsetting fitting spec path')
-                    fitting_spec_path = None
-                    break
-            elif ext == '.csv':
-                if fitting_data_path is None:
-                    fitting_data_path = os.path.join(proto_dir, filename)
-                else:
-                    # Ambiguous result, not a fitting experiment
-                    log.warning('Ambiguous result: unsetting fitting data path')
-                    fitting_data_path = None
-                    break
-        log.info('Found: ' + str(fitting_spec_path) + ' and ' + str(fitting_data_path))
-        if fitting_spec_path is None or fitting_data_path is None:
-            fitting_spec_path = fitting_data_path = None
+                    raise ValueError("Failed to find fitting specification within protocol")
+            else:
+                # This is what we're moving towards
+                fitting_spec_zip = os.path.join(temp_dir, 'fittingSpec.zip')
+                utils.Wget(fittingSpecUrl, fitting_spec_zip, signature)
+                fitting_spec_path = utils.UnpackArchive(fitting_spec_zip, temp_dir, 'fittingSpec')
         else:
-            log.info('Proceeding with fitting data')
-
+            # Not a fitting experiment
+            fitting_spec_path = fitting_data_path = None
 
         # Check whether their interfaces are compatible
         missing_terms, missing_optional_terms = utils.DetermineCompatibility(
             main_proto_path, main_model_path)
-        #TODO: CHECK FOR MISSING FSPEC/FDATA TERMS
+        # TODO: CHECK FOR MISSING FSPEC/FDATA TERMS
         if missing_terms:
             message = ("inapplicable - required ontology terms are not present in the model."
                        " Missing terms are:<br/>")
@@ -232,7 +223,7 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
         ReportError(callbackUrl, signature)
 
 
-#@app.task(name="fcws.tasks.RunExperiment")
+# @app.task(name="fcws.tasks.RunExperiment")
 def RunExperiment(
         callbackUrl, signature, modelPath, protoPath, fspecPath, fdataPath,
         tempDir):

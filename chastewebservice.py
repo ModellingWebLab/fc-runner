@@ -51,16 +51,16 @@ else:
         callBack = form["callBack"].value
         modelUrl = form["model"].value
         protocolUrl = form["protocol"].value
-        fcws.ScheduleExperiment(
-            callBack,
-            signature,
-            modelUrl,
-            protocolUrl,
-            user=form['user'].value,
-            isAdmin=(form['isAdmin'].value == 'true'),
-        )
+        args = (callBack, signature, modelUrl, protocolUrl)
+        kwargs = {
+            'user': form['user'].value,
+            'isAdmin': (form['isAdmin'].value == 'true'),
+        }
+        if 'dataset' in form and 'fittingSpec' in form:
+            kwargs['datasetUrl'] = form['dataset'].value
+            kwargs['fittingSpecUrl'] = form['fittingSpec'].value
+        fcws.ScheduleExperiment(*args, **kwargs)
     except Exception as e:
         print(signature.value, "failed due to unexpected error:", e, "<br/>")
         print("Full internal details follow:<br/>")
         raise
-

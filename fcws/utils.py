@@ -19,7 +19,9 @@ CHASTE_ROOT = config['chaste_root']
 FC_ROOT = os.path.join(CHASTE_ROOT, 'projects', 'FunctionalCuration')
 
 EXPECTED_EXTENSIONS = {'model': ['.cellml'],
-                       'proto': ['.txt', '.xml']}
+                       'proto': ['.txt', '.xml'],
+                       'dataset': ['.csv'],
+                       'fittingSpec': ['.txt']}
 
 MANIFEST = 'manifest.xml'
 
@@ -52,7 +54,7 @@ def UnpackArchive(archivePath, tempPath, contentType):
 
     Files will be unpacked into the path tempPath/contentType.
     """
-    assert contentType in ['model', 'proto']
+    assert contentType in EXPECTED_EXTENSIONS
     archive = zipfile.ZipFile(archivePath)
     output_path = os.path.join(tempPath, contentType)
     archive.extractall(output_path)
