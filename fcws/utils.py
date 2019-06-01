@@ -45,12 +45,13 @@ def Wget(url, localPath, signature):
                 local_file.write(chunk)
 
 
-def UnpackArchive(archivePath, tempPath, contentType):
+def UnpackArchive(archivePath, tempPath, contentType, ignoreManifest=False):
     """Unpack a COMBINE archive, and return the path to the primary unpacked file.
 
     :param archivePath:  path to the archive
     :param tempPath:  path to a temporary folder under which to unpack
     :param contentType:  whether the archive contains a model ('model') or protocol ('proto')
+    :param ignoreManifest:  if set, ignore the master file specified in the manifest
 
     Files will be unpacked into the path tempPath/contentType.
     """
@@ -61,7 +62,7 @@ def UnpackArchive(archivePath, tempPath, contentType):
     # Check if the archive manifest specifies the primary file
     primary_file = None
     manifest_path = os.path.join(output_path, MANIFEST)
-    if os.path.exists(manifest_path):
+    if not ignoreManifest and os.path.exists(manifest_path):
         manifest = ET.parse(manifest_path)
         for item in manifest.iter(
                 '{http://identifiers.org/combine.specifications/omex-manifest}content'):

@@ -171,7 +171,7 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl, datasetUrl=No
             # We're doing a fit
             dataset_zip = os.path.join(temp_dir, 'dataset.zip')
             utils.Wget(datasetUrl, dataset_zip, signature)
-            fitting_data_path = utils.UnpackArchive(dataset_zip, temp_dir, 'dataset')
+            fitting_data_path = utils.UnpackArchive(dataset_zip, temp_dir, 'dataset', ignoreManifest=True)
             if fittingSpecUrl == protocolUrl:
                 # Temporary hack: fitting spec is part of the protocol archive
                 proto_dir, proto_name = os.path.split(main_proto_path)
