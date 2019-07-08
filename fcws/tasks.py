@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import glob
 import os
+import logging
 import shutil
 import subprocess
 import tempfile
@@ -137,7 +138,7 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
 
 
 @app.task(name="fcws.tasks.CheckExperiment")
-def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
+def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl, datasetUrl=None, fittingSpecUrl=None):
     """Check a model/protocol combination for compatibility.
 
     If the interfaces match up, then the experiment can be run.
@@ -148,10 +149,14 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
     @param callbackUrl: URL to post status updates to
     @param signature: unique identifier for this experiment run
     @param modelUrl: where to download the model archive from
-    @param protoUrl: where to download the protocol archive from
+    @param protocolUrl: where to download the protocol archive from
+    @param datasetUrl: if doing a fit, where to download the reference dataset from
+    @param fittingSpecUrl: if doing a fit, the fitting specification
     """
+    log = logging.getLogger(__name__)
+
     try:
-        # Download the submitted COMBINE archives to disk in a temporary folder
+        # Download the submitted COMBINE archives to disk in temporary folder
         temp_dir = MakeTempDir()
         model_path = os.path.join(temp_dir, 'model.zip')
         proto_path = os.path.join(temp_dir, 'protocol.zip')
@@ -162,9 +167,34 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
         main_model_path = utils.UnpackArchive(model_path, temp_dir, 'model')
         main_proto_path = utils.UnpackArchive(proto_path, temp_dir, 'proto')
 
+        if datasetUrl and fittingSpecUrl:
+            # We're doing a fit
+            dataset_zip = os.path.join(temp_dir, 'dataset.zip')
+            utils.Wget(datasetUrl, dataset_zip, signature)
+            fitting_data_path = utils.UnpackArchive(dataset_zip, temp_dir, 'dataset', ignoreManifest=True)
+            if fittingSpecUrl == protocolUrl:
+                # Temporary hack: fitting spec is part of the protocol archive
+                proto_dir, proto_name = os.path.split(main_proto_path)
+                for filename in os.listdir(proto_dir):
+                    if (filename != proto_name and
+                            os.path.splitext(filename)[1] in utils.EXPECTED_EXTENSIONS['fittingSpec']):
+                        fitting_spec_path = os.path.join(proto_dir, filename)
+                        break
+                else:
+                    raise ValueError("Failed to find fitting specification within protocol")
+            else:
+                # This is what we're moving towards
+                fitting_spec_zip = os.path.join(temp_dir, 'fittingSpec.zip')
+                utils.Wget(fittingSpecUrl, fitting_spec_zip, signature)
+                fitting_spec_path = utils.UnpackArchive(fitting_spec_zip, temp_dir, 'fittingSpec')
+        else:
+            # Not a fitting experiment
+            fitting_spec_path = fitting_data_path = None
+
         # Check whether their interfaces are compatible
-        missing_terms, missing_optional_terms = utils.DetermineCompatibility(main_proto_path,
-                                                                             main_model_path)
+        missing_terms, missing_optional_terms = utils.DetermineCompatibility(
+            main_proto_path, main_model_path)
+        # TODO: CHECK FOR MISSING FSPEC/FDATA TERMS
         if missing_terms:
             message = ("inapplicable - required ontology terms are not present in the model."
                        " Missing terms are:<br/>")
@@ -180,21 +210,36 @@ def CheckExperiment(callbackUrl, signature, modelUrl, protocolUrl):
         else:
             # Run the experiment directly in this task,
             # to ensure it has access to the unpacked model & protocol
-            RunExperiment(callbackUrl, signature, main_model_path, main_proto_path, temp_dir)
+            RunExperiment(
+                callbackUrl,
+                signature,
+                main_model_path,
+                main_proto_path,
+                fitting_spec_path,
+                fitting_data_path,
+                temp_dir,
+            )
     except:
         ReportError(callbackUrl, signature)
 
 
-@app.task(name="fcws.tasks.RunExperiment")
-def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
+# @app.task(name="fcws.tasks.RunExperiment")
+def RunExperiment(
+        callbackUrl, signature, modelPath, protoPath, fspecPath, fdataPath,
+        tempDir):
     """Run a functional curation experiment.
 
     @param callbackUrl: URL to post status updates and results to
     @param signature: unique identifier for this experiment run
     @param modelPath: path to the main model file
     @param protoPath: path to the main protocol file
+    @param fspecPath: path to the main fitting specification file (or None)
+    @param fdataPath: path to the main fitting data file (or None)
     @param tempDir: folder in which to store any temporary files
     """
+    log = logging.getLogger(__name__)
+    log.info('RunExperiment called with ' + str(fspecPath) + ' and ' + str(fdataPath))
+
     try:
         # Tell the website we've started running
         Callback(callbackUrl, signature, {'returntype': 'running'})
@@ -204,13 +249,49 @@ def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
         # Also redirect stdout and stderr so we can debug any issues.
         for key, value in config['environment'].iteritems():
             os.environ[key] = value
-        args = [config['exe_path'], modelPath, protoPath, os.path.join(tempDir, 'output')]
+
+        if fspecPath and fdataPath:
+            log.info('Running fitting experiment')
+
+            for key, value in config['environment'].iteritems():
+                log.info('Setting environment variable ' + key + ': ' + value)
+                os.environ[key] = value
+
+            log.info('Using virtual environment ' + config['fitting_virtualenv'])
+
+            args = [
+                config['fitting_path'],
+                config['fitting_virtualenv'],
+                modelPath,
+                protoPath,
+                fspecPath,
+                fdataPath,
+                os.path.join(tempDir, 'output'),
+            ]
+
+        else:
+            log.info('Running functional curation experiment')
+
+            args = [
+                config['exe_path'],
+                modelPath,
+                protoPath,
+                os.path.join(tempDir, 'output'),
+            ]
+
         child_stdout_name = os.path.join(tempDir, 'stdout.txt')
         output_file = open(child_stdout_name, 'w')
         timeout = False
+        retcode = 0
         try:
-            child = subprocess.Popen(args, stdout=output_file, stderr=subprocess.STDOUT)
-            child.wait()
+            child = None
+            child = subprocess.Popen(
+                args,
+                stdout=output_file,
+                stderr=subprocess.STDOUT,
+                bufsize=1,
+            )
+            retcode = child.wait()
         except SoftTimeLimitExceeded:
             # If we're timed out, kill off the child process, but send back any partial output
             # - don't re-raise
@@ -220,11 +301,19 @@ def RunExperiment(callbackUrl, signature, modelPath, protoPath, tempDir):
             timeout = True
         except:
             # If any other error happens, just make sure the child is dead then report it
-            child.terminate()
-            time.sleep(5)
-            child.kill()
+            if child is not None:
+                child.terminate()
+                time.sleep(5)
+                child.kill()
             raise
         output_file.close()
+
+        #TODO
+        #if retcode:
+        #    Callback(callbackUrl, signature,
+        #        {'returntype': 'failed', 'returnmsg': output},
+        #        json=True
+        #    )
 
         # Zip up the outputs and post them to the callback
         output_path = os.path.join(tempDir, 'output.zip')

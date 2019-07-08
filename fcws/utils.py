@@ -19,7 +19,9 @@ CHASTE_ROOT = config['chaste_root']
 FC_ROOT = os.path.join(CHASTE_ROOT, 'projects', 'FunctionalCuration')
 
 EXPECTED_EXTENSIONS = {'model': ['.cellml'],
-                       'proto': ['.txt', '.xml']}
+                       'proto': ['.txt', '.xml'],
+                       'dataset': ['.csv'],
+                       'fittingSpec': ['.txt']}
 
 MANIFEST = 'manifest.xml'
 
@@ -43,23 +45,24 @@ def Wget(url, localPath, signature):
                 local_file.write(chunk)
 
 
-def UnpackArchive(archivePath, tempPath, contentType):
+def UnpackArchive(archivePath, tempPath, contentType, ignoreManifest=False):
     """Unpack a COMBINE archive, and return the path to the primary unpacked file.
 
     :param archivePath:  path to the archive
     :param tempPath:  path to a temporary folder under which to unpack
     :param contentType:  whether the archive contains a model ('model') or protocol ('proto')
+    :param ignoreManifest:  if set, ignore the master file specified in the manifest
 
     Files will be unpacked into the path tempPath/contentType.
     """
-    assert contentType in ['model', 'proto']
+    assert contentType in EXPECTED_EXTENSIONS
     archive = zipfile.ZipFile(archivePath)
     output_path = os.path.join(tempPath, contentType)
     archive.extractall(output_path)
     # Check if the archive manifest specifies the primary file
     primary_file = None
     manifest_path = os.path.join(output_path, MANIFEST)
-    if os.path.exists(manifest_path):
+    if not ignoreManifest and os.path.exists(manifest_path):
         manifest = ET.parse(manifest_path)
         for item in manifest.iter(
                 '{http://identifiers.org/combine.specifications/omex-manifest}content'):

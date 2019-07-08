@@ -39,19 +39,27 @@ elif 'getProtoInterface' in form:
     fcws.GetProtocolInterface(
         form['callBack'].value, form['signature'].value, form['getProtoInterface'].value)
 else:
+    # Standard action: schedule experiment
     for field in ['callBack', 'signature', 'model', 'protocol', 'user', 'isAdmin']:
         if field not in form:
             SendError("Missing required field.")
 
     print("Content-Type: text/plain\n\n")
-    signature = form["signature"]
+    signature = form["signature"].value
     # Wrap the rest in a try so we alert the caller properly if an exception occurs
     try:
-        callBack = form["callBack"]
-        modelUrl = form["model"]
-        protocolUrl = form["protocol"]
-        fcws.ScheduleExperiment(callBack.value, signature.value, modelUrl.value, protocolUrl.value,
-                                user=form['user'].value, isAdmin=(form['isAdmin'].value == 'true'))
+        callBack = form["callBack"].value
+        modelUrl = form["model"].value
+        protocolUrl = form["protocol"].value
+        args = (callBack, signature, modelUrl, protocolUrl)
+        kwargs = {
+            'user': form['user'].value,
+            'isAdmin': (form['isAdmin'].value == 'true'),
+        }
+        if 'dataset' in form and 'fittingSpec' in form:
+            kwargs['datasetUrl'] = form['dataset'].value
+            kwargs['fittingSpecUrl'] = form['fittingSpec'].value
+        fcws.ScheduleExperiment(*args, **kwargs)
     except Exception as e:
         print(signature.value, "failed due to unexpected error:", e, "<br/>")
         print("Full internal details follow:<br/>")
