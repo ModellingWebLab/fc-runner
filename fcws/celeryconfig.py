@@ -29,7 +29,7 @@ task_soft_time_limit = 60 * 60 * 15  # 15 hours
 
 # We need a result backend to track task status.
 # However we don't need to store results, since the tasks will callback to the front-end.
-result_backend = 'amqp'
+result_backend = 'rpc'
 task_ignore_result = True
 
 # We don't make use of rate limiting, so turn it off for a performance boost
