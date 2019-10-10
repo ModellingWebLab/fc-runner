@@ -61,7 +61,7 @@ def Callback(callbackUrl, signature, data, json=False, isRetriedError=False, **k
             break  # Callback successful so don't try again
     else:
         print("Giving up on callback after %d attempts." %
-              celeryconfig.WEB_LAB_MAX_CALLBACK_ATTEMPTS)
+              celeryconfig.weblab_max_callback_attempts)
         if not isRetriedError:
             # This is the first time we're giving up, so define an error message for later delivery
             data = {'returntype': 'failed', 'returnmsg': 'No response received from server'}
@@ -320,6 +320,11 @@ def RunExperiment(
         output_files = glob.glob(os.path.join(tempDir, 'output', '*', '*', '*'))  # Yuck!
         output_zip = zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED)
         output_zip.write(child_stdout_name, 'stdout.txt')
+        # Remove any manifest file since we'll need to create a new one with stdout.txt in (and possibly errors.txt)
+        for ofile in output_files:
+            if os.path.basename(ofile) == 'manifest.xml':
+                output_files.remove(ofile)
+                break
         if timeout:
             # Add a message about the timeout to the errors.txt file
             # (which is created if not present)
@@ -330,11 +335,6 @@ def RunExperiment(
             else:
                 error_file_path = os.path.join(tempDir, 'errors.txt')
                 output_files.append(error_file_path)
-                # Remove any manifest file since we'll need to create a new one with errors.txt in
-                for ofile in output_files:
-                    if os.path.basename(ofile) == 'manifest.xml':
-                        output_files.remove(ofile)
-                        break
             error_file = open(error_file_path, 'a+')
             error_file.write("\nExperiment terminated due to exceeding time limit\n")
             error_file.close()
