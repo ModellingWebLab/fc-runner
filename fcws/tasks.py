@@ -46,12 +46,13 @@ def Callback(callbackUrl, signature, data, json=False, isRetriedError=False, **k
     for attempt in range(celeryconfig.weblab_max_callback_attempts):
         try:
             r = requests.post(callbackUrl, verify=False, timeout=celeryconfig.weblab_timeout, **kwargs)
-            r.raise_for_status()
         except SoftTimeLimitExceeded:
             # Just hope we managed to send relevant data!
             print("Soft time limit thrown while sending callback")
+            import traceback
+            traceback.print_exc()
             break
-        except requests.exceptions.RequestException as e:
+        if 400 <= r.status_code < 600:
             print("Error attempting callback at attempt %d: %s" % (attempt + 1, str(e)))
             time.sleep(60 * 2.0**attempt)  # Exponential backoff, in seconds
             # Rewind any file handles so we read from the beginning again
