@@ -1,4 +1,4 @@
-# WL1 uses Celery 3, so pinning to that for now
-celery<4
+# We use auto-retry with exponential backoff
+celery>=4.2
 
 requests
