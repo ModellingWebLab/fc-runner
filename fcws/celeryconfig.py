@@ -37,4 +37,7 @@ worker_disable_rate_limits = True
 
 # How many times to try calling back to the front-end before giving up.
 # We employ an exponential backoff on attempts, so delay 1, 2, 4, etc. minutes.
-WEB_LAB_MAX_CALLBACK_ATTEMPTS = 3
+weblab_max_callback_attempts = 3
+
+# How long in seconds to wait for the front-end to respond
+weblab_timeout = 60 * 2

@@ -43,9 +43,9 @@ def Callback(callbackUrl, signature, data, json=False, isRetriedError=False, **k
         kwargs['data'] = data
     r = requests.Response()  # In case we never get through
     r.status_code = 500
-    for attempt in range(celeryconfig.WEB_LAB_MAX_CALLBACK_ATTEMPTS):
+    for attempt in range(celeryconfig.weblab_max_callback_attempts):
         try:
-            r = requests.post(callbackUrl, verify=False, **kwargs)
+            r = requests.post(callbackUrl, verify=False, timeout=celeryconfig.weblab_timeout, **kwargs)
             r.raise_for_status()
         except SoftTimeLimitExceeded:
             # Just hope we managed to send relevant data!
