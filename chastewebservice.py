@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
-
 import cgi
 import cgitb
 import os
 import sys
 
 import fcws
+
+
 
 temporaryDir = fcws.config['temp_dir']
 debugPrefix = fcws.config['debug_log_file_prefix']

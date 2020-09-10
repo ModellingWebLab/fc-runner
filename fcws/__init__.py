@@ -1,9 +1,8 @@
 # Back-end web service routines for the functional curation website
 
-from __future__ import print_function
-
 import json
 import os
+
 
 config = json.load(open(os.path.join(os.path.dirname(__file__), 'config.json')))
 user_queue_map = json.load(open(os.path.join(os.path.dirname(__file__), 'usermap.json')))

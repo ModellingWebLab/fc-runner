@@ -1,7 +1,5 @@
 # Task queue for Functional Curation web service
 
-from __future__ import print_function
-
 import glob
 import os
 import logging
@@ -49,7 +47,7 @@ def Callback(callbackUrl, signature, data, json=False, isRetriedError=False, **k
             print("Error attempting callback at attempt %d: %s" % (attempt + 1, str(e)))
             time.sleep(60 * 2.0**attempt)  # Exponential backoff, in seconds
             # Rewind any file handles so we read from the beginning again
-            for fp in kwargs.get('files', {}).itervalues():
+            for fp in kwargs.get('files', {}).values():
                 fp.seek(0)
         else:
             break  # Callback successful so don't try again
@@ -241,13 +239,13 @@ def RunExperiment(
         # Call FunctionalCuration exe, writing output to the temporary folder containing inputs
         # (or rather, a subfolder thereof).
         # Also redirect stdout and stderr so we can debug any issues.
-        for key, value in config['environment'].iteritems():
+        for key, value in config['environment'].items():
             os.environ[key] = value
 
         if fspecPath and fdataPath:
             log.info('Running fitting experiment')
 
-            for key, value in config['environment'].iteritems():
+            for key, value in config['environment'].items():
                 log.info('Setting environment variable ' + key + ': ' + value)
                 os.environ[key] = value
 
