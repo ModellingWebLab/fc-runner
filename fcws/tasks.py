@@ -7,12 +7,15 @@ import shutil
 import subprocess
 import tempfile
 import time
+import traceback
 import zipfile
 
 import celery
 from celery.exceptions import SoftTimeLimitExceeded
 import requests
 
+from fc import Protocol
+from fc.file_handling import combine_manifest
 
 from . import config
 from . import celeryconfig
@@ -101,20 +104,15 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
         utils.Wget(protocolUrl, proto_path, signature)
         main_proto_path = utils.UnpackArchive(proto_path, temp_dir, 'proto')
         # Check a full parse of the protocol succeeds; only continue if it does
-        for key, value in config['environment'].iteritems():
-            os.environ[key] = value
-        child = subprocess.Popen(
-            [config['syntax_check_path'], main_proto_path],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output, unused_err = child.communicate()
-        retcode = child.poll()
-        if retcode:
+        try:
+            proto = Protocol(main_proto_path)
+        except Exception:
             Callback(callbackUrl, signature,
-                     {'returntype': 'failed', 'returnmsg': error_prefix + output},
+                     {'returntype': 'failed', 'returnmsg': traceback.format_exc()},
                      json=True)
         else:
             # Determine the interface, getting sets of ontology terms
-            required_terms, optional_terms = utils.GetProtoInterface(main_proto_path)
+            required_terms, optional_terms = utils.GetProtoInterface(proto)
             # Report back
             Callback(callbackUrl, signature,
                      {'returntype': 'success',
@@ -342,30 +340,9 @@ def RunExperiment(
                     break
             else:
                 outcome = 'failed'  # No outputs created => total failure
-        # Add a manifest if Chaste didn't create one
-        if 'manifest.xml' not in output_zip.namelist():
-            manifest = open(os.path.join(tempDir, 'manifest.xml'), 'w')
-            manifest.write("""<?xml version='1.0' encoding='utf-8'?>
-<omexManifest xmlns='http://identifiers.org/combine.specifications/omex-manifest'>
-    <content location='manifest.xml'
-             format='http://identifiers.org/combine.specifications/omex-manifest'/>
-""")
-            for filename in output_zip.namelist():
-                try:
-                    ext = os.path.splitext(filename)[1]
-                    format = {'.txt': 'text/plain',
-                              '.csv': 'text/csv',
-                              '.png': 'image/png',
-                              '.eps': 'application/postscript',
-                              '.xml': 'text/xml',
-                              '.cellml': 'http://identifiers.org/combine.specifications/cellml.1.0'
-                              }[ext]
-                except Exception:
-                    format = 'application/octet-stream'
-                manifest.write("  <content location='%s' format='%s'/>\n" % (filename, format))
-            manifest.write("</omexManifest>")
-            manifest.close()
-            output_zip.write(os.path.join(tempDir, 'manifest.xml'), 'manifest.xml')
+        # Add a manifest with the final contents list
+        manifest = combine_manifest(output_zip.namelist())
+        output_zip.writestr('manifest.xml', manifest)
         output_zip.close()
 
         files = {'experiment': open(output_path, 'rb')}
