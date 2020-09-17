@@ -81,15 +81,6 @@ def UnpackArchive(archivePath, tempPath, contentType, ignoreManifest=False):
     return primary_path
 
 
-def GetProtoInterface(protocol):
-    """Get the set of ontology terms used by the given protocol, recursively processing imports.
-
-    :param protocol: a parsed :class:`fc.Protocol` instance
-    :return: a pair (required terms, optional terms) of sets of ontology terms, as full URI strings
-    """
-    return protocol.get_required_model_annotations()
-
-
 def DetermineCompatibility(protoPath, modelPath):
     """Determine whether the given protocol and model are compatible.
 

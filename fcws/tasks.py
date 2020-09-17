@@ -112,12 +112,16 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
                      json=True)
         else:
             # Determine the interface, getting sets of ontology terms
-            required_terms, optional_terms = utils.GetProtoInterface(proto)
+            required_terms, optional_terms = proto.get_required_model_annotations()
+            ioputs = proto.get_protocol_interface()
             # Report back
             Callback(callbackUrl, signature,
-                     {'returntype': 'success',
-                      'required': list(required_terms),
-                      'optional': list(optional_terms)},
+                     {
+                         'returntype': 'success',
+                         'required': list(required_terms),
+                         'optional': list(optional_terms),
+                         'ioputs': list(ioputs),
+                     },
                      json=True)
     except:
         ReportError(callbackUrl, signature, prefix=error_prefix, json=True)
