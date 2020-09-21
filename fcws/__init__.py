@@ -54,3 +54,9 @@ def GetProtocolInterface(callbackUrl, signature, protoUrl):
     """Get the ontology terms forming the interface for a protocol."""
     from .tasks import GetProtocolInterface
     GetProtocolInterface.apply_async((callbackUrl, signature, protoUrl), queue=GetQueue('', True))
+
+
+def GetModelInterface(callbackUrl, signature, modelUrl):
+    """Get the ontology terms forming the interface for a model."""
+    from .tasks import GetModelInterface
+    GetModelInterface.apply_async((callbackUrl, signature, modelUrl), queue=GetQueue('', True))

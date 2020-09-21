@@ -14,8 +14,10 @@ import celery
 from celery.exceptions import SoftTimeLimitExceeded
 import requests
 
+from cellmlmanip import load_model
 from fc import Protocol
 from fc.file_handling import combine_manifest
+from fc.parsing.rdf import get_used_annotations
 
 from . import config
 from . import celeryconfig
@@ -85,6 +87,39 @@ def MakeTempDir():
     return tempfile.mkdtemp(dir=config['temp_dir'])
 
 
+@app.task(name="fcws.tasks.GetModelInterface")
+def GetModelInterface(callbackUrl, signature, modelUrl):
+    """Get the ontology terms used to annotate this model's variables.
+
+    @param callbackUrl: URL to post status updates to
+    @param signature: unique identifier for this web service call
+    @param protocolUrl: where to download the model archive from
+    """
+    temp_dir = None
+    error_prefix = "Unable to determine interface for model due to errors parsing file:\n"
+    try:
+        # Download the model archive to a temporary folder & unpack
+        temp_dir = MakeTempDir()
+        model_path = os.path.join(temp_dir, 'model.zip')
+        utils.Wget(modelUrl, model_path, signature)
+        main_model_path = utils.UnpackArchive(model_path, temp_dir, 'model')
+        # Parse the model and find annotations
+        model = load_model(main_model_path)
+        model_terms = get_used_annotations(model)
+        # Report back
+        Callback(callbackUrl, signature,
+                 {
+                     'returntype': 'success',
+                     'model_terms': list(model_terms),
+                 },
+                 json=True)
+    except Exception:
+        ReportError(callbackUrl, signature, prefix=error_prefix, json=True)
+    finally:
+        # Remove the temporary folder, if created
+        if temp_dir and os.path.isdir(temp_dir):
+            shutil.rmtree(temp_dir)
+
 @app.task(name="fcws.tasks.GetProtocolInterface")
 def GetProtocolInterface(callbackUrl, signature, protocolUrl):
     """Get the ontology terms forming the interface to a protocol.
@@ -107,9 +142,7 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
         try:
             proto = Protocol(main_proto_path)
         except Exception:
-            Callback(callbackUrl, signature,
-                     {'returntype': 'failed', 'returnmsg': traceback.format_exc()},
-                     json=True)
+            ReportError(callbackUrl, signature, prefix=error_prefix, json=True)
         else:
             # Determine the interface, getting sets of ontology terms
             required_terms, optional_terms = proto.get_required_model_annotations()
