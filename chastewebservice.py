@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
-
 import cgi
 import cgitb
 import os
 import sys
 
 import fcws
+
+
 
 temporaryDir = fcws.config['temp_dir']
 debugPrefix = fcws.config['debug_log_file_prefix']
@@ -30,6 +30,14 @@ if 'cancelTask' in form:
     # Special action: cancel or revoke an experiment
     print("Content-Type: text/plain\n\n")
     fcws.CancelExperiment(form['cancelTask'].value)
+elif 'getModelInterface' in form:
+    # Special action: get the ontology interface for a model
+    for field in ['callBack', 'signature']:
+        if field not in form:
+            SendError("Missing required field.")
+    print("Content-Type: text/plain\n\n")
+    fcws.GetModelInterface(
+        form['callBack'].value, form['signature'].value, form['GetModelInterface'].value)
 elif 'getProtoInterface' in form:
     # Special action: get the ontology interface for a protocol
     for field in ['callBack', 'signature']:

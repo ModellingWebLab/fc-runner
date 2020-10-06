@@ -1,9 +1,8 @@
 # Back-end web service routines for the functional curation website
 
-from __future__ import print_function
-
 import json
 import os
+
 
 config = json.load(open(os.path.join(os.path.dirname(__file__), 'config.json')))
 user_queue_map = json.load(open(os.path.join(os.path.dirname(__file__), 'usermap.json')))
@@ -55,3 +54,9 @@ def GetProtocolInterface(callbackUrl, signature, protoUrl):
     """Get the ontology terms forming the interface for a protocol."""
     from .tasks import GetProtocolInterface
     GetProtocolInterface.apply_async((callbackUrl, signature, protoUrl), queue=GetQueue('', True))
+
+
+def GetModelInterface(callbackUrl, signature, modelUrl):
+    """Get the ontology terms forming the interface for a model."""
+    from .tasks import GetModelInterface
+    GetModelInterface.apply_async((callbackUrl, signature, modelUrl), queue=GetQueue('', True))

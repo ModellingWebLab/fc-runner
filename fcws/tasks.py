@@ -1,7 +1,5 @@
 # Task queue for Functional Curation web service
 
-from __future__ import print_function
-
 import glob
 import os
 import logging
@@ -9,12 +7,17 @@ import shutil
 import subprocess
 import tempfile
 import time
+import traceback
 import zipfile
 
 import celery
 from celery.exceptions import SoftTimeLimitExceeded
 import requests
 
+from cellmlmanip import load_model
+from fc import Protocol
+from fc.file_handling import combine_manifest
+from fc.parsing.rdf import get_used_annotations
 
 from . import config
 from . import celeryconfig
@@ -49,7 +52,7 @@ def Callback(callbackUrl, signature, data, json=False, isRetriedError=False, **k
             print("Error attempting callback at attempt %d: %s" % (attempt + 1, str(e)))
             time.sleep(60 * 2.0**attempt)  # Exponential backoff, in seconds
             # Rewind any file handles so we read from the beginning again
-            for fp in kwargs.get('files', {}).itervalues():
+            for fp in kwargs.get('files', {}).values():
                 fp.seek(0)
         else:
             break  # Callback successful so don't try again
@@ -84,6 +87,39 @@ def MakeTempDir():
     return tempfile.mkdtemp(dir=config['temp_dir'])
 
 
+@app.task(name="fcws.tasks.GetModelInterface")
+def GetModelInterface(callbackUrl, signature, modelUrl):
+    """Get the ontology terms used to annotate this model's variables.
+
+    @param callbackUrl: URL to post status updates to
+    @param signature: unique identifier for this web service call
+    @param protocolUrl: where to download the model archive from
+    """
+    temp_dir = None
+    error_prefix = "Unable to determine interface for model due to errors parsing file:\n"
+    try:
+        # Download the model archive to a temporary folder & unpack
+        temp_dir = MakeTempDir()
+        model_path = os.path.join(temp_dir, 'model.zip')
+        utils.Wget(modelUrl, model_path, signature)
+        main_model_path = utils.UnpackArchive(model_path, temp_dir, 'model')
+        # Parse the model and find annotations
+        model = load_model(main_model_path)
+        model_terms = get_used_annotations(model)
+        # Report back
+        Callback(callbackUrl, signature,
+                 {
+                     'returntype': 'success',
+                     'model_terms': list(model_terms),
+                 },
+                 json=True)
+    except Exception:
+        ReportError(callbackUrl, signature, prefix=error_prefix, json=True)
+    finally:
+        # Remove the temporary folder, if created
+        if temp_dir and os.path.isdir(temp_dir):
+            shutil.rmtree(temp_dir)
+
 @app.task(name="fcws.tasks.GetProtocolInterface")
 def GetProtocolInterface(callbackUrl, signature, protocolUrl):
     """Get the ontology terms forming the interface to a protocol.
@@ -103,25 +139,22 @@ def GetProtocolInterface(callbackUrl, signature, protocolUrl):
         utils.Wget(protocolUrl, proto_path, signature)
         main_proto_path = utils.UnpackArchive(proto_path, temp_dir, 'proto')
         # Check a full parse of the protocol succeeds; only continue if it does
-        for key, value in config['environment'].iteritems():
-            os.environ[key] = value
-        child = subprocess.Popen(
-            [config['syntax_check_path'], main_proto_path],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output, unused_err = child.communicate()
-        retcode = child.poll()
-        if retcode:
-            Callback(callbackUrl, signature,
-                     {'returntype': 'failed', 'returnmsg': error_prefix + output},
-                     json=True)
+        try:
+            proto = Protocol(main_proto_path)
+        except Exception:
+            ReportError(callbackUrl, signature, prefix=error_prefix, json=True)
         else:
             # Determine the interface, getting sets of ontology terms
-            required_terms, optional_terms = utils.GetProtoInterface(main_proto_path)
+            required_terms, optional_terms = proto.get_required_model_annotations()
+            ioputs = proto.get_protocol_interface()
             # Report back
             Callback(callbackUrl, signature,
-                     {'returntype': 'success',
-                      'required': list(required_terms),
-                      'optional': list(optional_terms)},
+                     {
+                         'returntype': 'success',
+                         'required': list(required_terms),
+                         'optional': list(optional_terms),
+                         'ioputs': list(ioputs),
+                     },
                      json=True)
     except:
         ReportError(callbackUrl, signature, prefix=error_prefix, json=True)
@@ -241,13 +274,13 @@ def RunExperiment(
         # Call FunctionalCuration exe, writing output to the temporary folder containing inputs
         # (or rather, a subfolder thereof).
         # Also redirect stdout and stderr so we can debug any issues.
-        for key, value in config['environment'].iteritems():
+        for key, value in config['environment'].items():
             os.environ[key] = value
 
         if fspecPath and fdataPath:
             log.info('Running fitting experiment')
 
-            for key, value in config['environment'].iteritems():
+            for key, value in config['environment'].items():
                 log.info('Setting environment variable ' + key + ': ' + value)
                 os.environ[key] = value
 
@@ -344,30 +377,9 @@ def RunExperiment(
                     break
             else:
                 outcome = 'failed'  # No outputs created => total failure
-        # Add a manifest if Chaste didn't create one
-        if 'manifest.xml' not in output_zip.namelist():
-            manifest = open(os.path.join(tempDir, 'manifest.xml'), 'w')
-            manifest.write("""<?xml version='1.0' encoding='utf-8'?>
-<omexManifest xmlns='http://identifiers.org/combine.specifications/omex-manifest'>
-    <content location='manifest.xml'
-             format='http://identifiers.org/combine.specifications/omex-manifest'/>
-""")
-            for filename in output_zip.namelist():
-                try:
-                    ext = os.path.splitext(filename)[1]
-                    format = {'.txt': 'text/plain',
-                              '.csv': 'text/csv',
-                              '.png': 'image/png',
-                              '.eps': 'application/postscript',
-                              '.xml': 'text/xml',
-                              '.cellml': 'http://identifiers.org/combine.specifications/cellml.1.0'
-                              }[ext]
-                except Exception:
-                    format = 'application/octet-stream'
-                manifest.write("  <content location='%s' format='%s'/>\n" % (filename, format))
-            manifest.write("</omexManifest>")
-            manifest.close()
-            output_zip.write(os.path.join(tempDir, 'manifest.xml'), 'manifest.xml')
+        # Add a manifest with the final contents list
+        manifest = combine_manifest(output_zip.namelist())
+        output_zip.writestr('manifest.xml', manifest)
         output_zip.close()
 
         files = {'experiment': open(output_path, 'rb')}

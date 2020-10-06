@@ -13,10 +13,10 @@ import requests
 import xml.etree.ElementTree as ET
 import zipfile
 
-from . import config
+from fc import Protocol
+import fc.parsing.CompactSyntaxParser as CSP
 
-CHASTE_ROOT = config['chaste_root']
-FC_ROOT = os.path.join(CHASTE_ROOT, 'projects', 'FunctionalCuration')
+from . import config
 
 EXPECTED_EXTENSIONS = {'model': ['.cellml'],
                        'proto': ['.txt', '.xml'],
@@ -24,13 +24,6 @@ EXPECTED_EXTENSIONS = {'model': ['.cellml'],
                        'fittingSpec': ['.txt']}
 
 MANIFEST = 'manifest.xml'
-
-sys.path[0:0] = [os.path.join(FC_ROOT, 'src/proto/parsing'),
-                 os.path.join(FC_ROOT, 'src/python'),
-                 os.path.join(CHASTE_ROOT, 'python/pycml')]
-import CompactSyntaxParser as CSP  # noqa
-import cellml_metadata  # noqa
-import pycml  # noqa
 
 
 def Wget(url, localPath, signature):
@@ -88,106 +81,6 @@ def UnpackArchive(archivePath, tempPath, contentType, ignoreManifest=False):
     return primary_path
 
 
-def GetProtoInterface(protoPath):
-    """Get the set of ontology terms used by the given protocol, recursively processing imports."""
-    parser = CSP.CompactSyntaxParser
-    nested_proto = CSP.MakeKw('nests') + CSP.MakeKw('protocol') - parser.quotedUri
-    # The cut-down import parser just looks at the URI,
-    # ignoring any overrides which may follow within braces.
-    import_stmt = CSP.p.Group(
-        CSP.MakeKw('import') - CSP.Optional(parser.ncIdent + parser.eq, default='') +
-        parser.quotedUri)
-    # Interface section starts with:
-    # modelInterface = p.Group(MakeKw('model') - MakeKw('interface') - obrace
-    var_ref = parser.cIdent.re
-    ns_maps = {}
-    terms = set()
-    optional_terms = set()
-
-    def AddTerm(qname, termSet=terms):
-        prefix, name = qname.split(':')
-        nsuri = ns_maps[prefix]
-        termSet.add(nsuri + name)
-
-    def ProcessInput(res):
-        qname = res[0].tokens['name']
-        if 'units' not in res[0].tokens or 'initial_value' not in res[0].tokens:
-            # Input is not optional, so record as part of the interface
-            AddTerm(qname)
-        else:
-            AddTerm(qname, optional_terms)
-
-    def ProcessOutput(res):
-        AddTerm(res[0].tokens['name'])
-
-    def ProcessOptional(res):
-        AddTerm(res[0].tokens['name'], optional_terms)
-        if 'default' in res[0].tokens:
-            for match in var_ref.finditer(res[0].default_expr):
-                # Note that var_ref guarantees only a single colon
-                prefix, name = match.group(0).split(':')
-                nsuri = ns_maps.get(prefix, None)
-                if nsuri:
-                    optional_terms.add(nsuri + name)
-
-    def ProcessNsDecl(res):
-        ns_maps[res[0]['prefix']] = res[0]['uri']
-
-    def ProcessImport(source_uri):
-        # Relative URIs must be resolved relative to this protocol file,
-        # or the library folder if not found
-        base = os.path.dirname(protoPath)
-        source = source_uri
-        if not os.path.isabs(source):
-            source = os.path.join(base, source)
-        if not os.path.exists(source):
-            # Try resolving relative to the library folder
-            library = os.path.join(FC_ROOT, 'src', 'proto', 'library')
-            source = os.path.join(library, source_uri)
-        import_terms, import_optional_terms = GetProtoInterface(source)
-        terms.update(import_terms)
-        optional_terms.update(import_optional_terms)
-
-    grammars = {parser.nsDecl: ProcessNsDecl,
-                import_stmt: (lambda res: ProcessImport(res[0][1])),
-                parser.inputVariable: ProcessInput,
-                parser.outputVariable: ProcessOutput,
-                parser.optionalVariable: ProcessOptional,
-                nested_proto: (lambda res: ProcessImport(res[0]))}
-    in_conversion_rule = False
-    for line in open(protoPath, 'rU'):
-        stripped = line.strip()
-        default_check = True
-        if stripped.startswith('convert'):
-            in_conversion_rule = True
-        else:
-            for grammar, processor in grammars.items():
-                try:
-                    # TODO: This breaks with multi-line items!
-                    match = grammar.parseString(line)
-                    in_conversion_rule = False
-                except CSP.p.ParseBaseException:
-                    continue
-                processor(match)
-                default_check = False
-                break
-        if default_check:
-            if (stripped.startswith('define ') or stripped.startswith('clamp ') or
-                    stripped.startswith('var ') or stripped == '}'):
-                in_conversion_rule = False
-            # Default check: Scan for any variable references,
-            # and see if they're in a known namespace
-            for match in var_ref.finditer(line):
-                prefix, name = match.group(0).split(':')
-                nsuri = ns_maps.get(prefix, None)
-                if nsuri:
-                    if in_conversion_rule:
-                        optional_terms.add(nsuri + name)
-                    else:
-                        terms.add(nsuri + name)
-    return terms - optional_terms, optional_terms
-
-
 def DetermineCompatibility(protoPath, modelPath):
     """Determine whether the given protocol and model are compatible.
 
@@ -197,22 +90,5 @@ def DetermineCompatibility(protoPath, modelPath):
 
     NB: Only works with textual syntax protocols at present; assumes OK otherwise.
     """
-    if not protoPath.endswith('.txt'):
-        return [], []
-    proto_terms, optional_terms = GetProtoInterface(protoPath)
-    # Get the terms defined by the model
-    model_doc = pycml.amara_parse_cellml(modelPath)
-    named_uris = cellml_metadata.get_targets(
-        model_doc.model, None, cellml_metadata.create_rdf_node(('bqbiol:is', pycml.NSS['bqbiol'])))
-    category_uris = cellml_metadata.get_targets(
-        model_doc.model, None,
-        cellml_metadata.create_rdf_node(('bqbiol:isVersionOf', pycml.NSS['bqbiol'])))
-    model_terms = set(str(uri) for uri in named_uris + category_uris)
-    model_terms.add(  # Present implicitly
-        'https://chaste.comlab.ox.ac.uk/cellml/ns/oxford-metadata#state_variable')
-    # Return the mismatch, if any, as a sorted list
-    needed_terms = list(proto_terms - model_terms)
-    needed_terms.sort()
-    missing_optional_terms = list(optional_terms - model_terms)
-    missing_optional_terms.sort()
-    return needed_terms, missing_optional_terms
+    protocol = Protocol(protoPath)
+    return protocol.check_model_compatibility(modelPath)
