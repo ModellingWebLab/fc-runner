@@ -372,7 +372,7 @@ def RunExperiment(
             outcome = 'success'
         else:
             for filename in output_zip.namelist():
-                if filename.endswith('gnuplot_data.csv'):
+                if filename.endswith('plot_data.csv'):
                     outcome = 'partial'  # Some output plots created => might be useful
                     break
             else:
