@@ -1,4 +1,4 @@
 # We use auto-retry with exponential backoff
-celery>=4.2
+celery>=5.3
 
 requests
