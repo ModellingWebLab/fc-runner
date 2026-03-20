@@ -1,4 +1,6 @@
-# Back-end web service routines for the functional curation website
+"""
+Functional Curation web service (FCWS) back-end routines for the WebLab.
+"""
 
 import json
 import os
